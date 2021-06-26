@@ -129,7 +129,7 @@ static void ble_update(void *pvParameters)
     vTaskDelete(NULL);
 }
 
-static void ble_set(void *pvParameters)
+void ble_adv_init()
 {
 	
 	ESP_ERROR_CHECK(esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT));
@@ -146,8 +146,6 @@ static void ble_set(void *pvParameters)
     else {
         ESP_LOGE(DEMO_TAG, "Config iBeacon data failed: %s\n", esp_err_to_name(status));
     }
-	
-    vTaskDelete(NULL);
 }
 
 
@@ -155,6 +153,6 @@ static void ble_set(void *pvParameters)
 void app_main(void)
 {
 	    ESP_ERROR_CHECK(nvs_flash_init());
-	    xTaskCreate(&ble_set, "ble_envio", 40192, NULL, 1, NULL);
+	    ble_adv_init();
 	    xTaskCreate(&ble_update, "update", 8192, NULL, 2, NULL);
 }
