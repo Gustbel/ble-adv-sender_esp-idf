@@ -18,6 +18,15 @@
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 
+#include <stdio.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "esp_log.h"
+#include "esp_system.h"
+#include "nvs_flash.h"
+#include "esp_event.h"
+#include "esp_tls.h"
+
 static const char* DEMO_TAG = "ADV_DEV_DEMO";
 
 ///Declare static functions
@@ -34,6 +43,21 @@ static esp_ble_adv_params_t ble_adv_params = {
     .adv_filter_policy = ADV_FILTER_ALLOW_SCAN_ANY_CON_ANY,
 };
 
+
+uint8_t adv_data_raw[27] = {
+          2, ESP_BLE_AD_TYPE_FLAG, (ESP_BLE_ADV_FLAG_GEN_DISC | ESP_BLE_ADV_FLAG_BREDR_NOT_SPT), // advertising flags
+          0x05, ESP_BLE_AD_TYPE_INT_RANGE,
+          0x06, 0x00, // BLE connection settings between 7.5ms
+          0x30, 0x00, // and 30ms
+          17, ESP_BLE_AD_TYPE_16SRV_CMPL,
+          0x31, 0x12,
+          0x32, 0x12,
+          0x33, 0x12,
+          0x34, 0x12,
+          0x35, 0x12,
+          0x36, 0x12,
+          0x37, 0x12,
+          0x38, 0x12};
 
 static void esp_gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param)
 {
@@ -88,31 +112,33 @@ void ble_adv_device_init(void)
     ble_adv_device_appRegister();
 }
 
-void app_main(void)
+
+static void ble_update(void *pvParameters)
 {
-    ESP_ERROR_CHECK(nvs_flash_init());
-    ESP_ERROR_CHECK(esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT));
-    esp_bt_controller_config_t bt_cfg = BT_CONTROLLER_INIT_CONFIG_DEFAULT();
+	while(1)
+	{	
+		adv_data_raw[11]++;
+		
+		printf("Data[11]: 0x%x\n", adv_data_raw[11]);
+				
+		esp_ble_gap_config_adv_data_raw((uint8_t*)&adv_data_raw, sizeof(adv_data_raw));
+		
+		vTaskDelay( (1000) / portTICK_PERIOD_MS);
+	}
+	
+    vTaskDelete(NULL);
+}
+
+static void ble_set(void *pvParameters)
+{
+	
+	ESP_ERROR_CHECK(esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT));
+ esp_bt_controller_config_t bt_cfg = BT_CONTROLLER_INIT_CONFIG_DEFAULT();
     status = esp_bt_controller_init(&bt_cfg);
 	esp_bt_controller_enable(ESP_BT_MODE_BLE);
 
     ble_adv_device_init();
 
-
-uint8_t adv_data_raw[27] = {
-          2, ESP_BLE_AD_TYPE_FLAG, (ESP_BLE_ADV_FLAG_GEN_DISC | ESP_BLE_ADV_FLAG_BREDR_NOT_SPT), // advertising flags
-          0x05, ESP_BLE_AD_TYPE_INT_RANGE,
-          0x06, 0x00, // BLE connection settings between 7.5ms
-          0x30, 0x00, // and 30ms
-          17, ESP_BLE_AD_TYPE_16SRV_CMPL,
-          0x31, 0x12,
-          0x32, 0x12,
-          0x33, 0x12,
-          0x34, 0x12,
-          0x35, 0x12,
-          0x36, 0x12,
-          0x37, 0x12,
-          0x38, 0x12};
 
     if (status == ESP_OK){
         esp_ble_gap_config_adv_data_raw((uint8_t*)&adv_data_raw, sizeof(adv_data_raw));
@@ -120,5 +146,15 @@ uint8_t adv_data_raw[27] = {
     else {
         ESP_LOGE(DEMO_TAG, "Config iBeacon data failed: %s\n", esp_err_to_name(status));
     }
+	
+    vTaskDelete(NULL);
+}
 
+
+
+void app_main(void)
+{
+	    ESP_ERROR_CHECK(nvs_flash_init());
+	    xTaskCreate(&ble_set, "ble_envio", 40192, NULL, 1, NULL);
+	    xTaskCreate(&ble_update, "update", 8192, NULL, 2, NULL);
 }
